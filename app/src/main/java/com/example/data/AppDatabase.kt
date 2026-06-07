@@ -1,11 +1,17 @@
 package com.example.data
 
 import android.content.Context
-import androidx.room.*
+import androidx.room.Database
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Room
+import androidx.room.RoomDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface ChatDao {
+interface ChatMessageDao {
     @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
     fun getAllMessages(): Flow<List<ChatMessage>>
 
@@ -13,27 +19,27 @@ interface ChatDao {
     suspend fun insertMessage(message: ChatMessage)
 
     @Query("DELETE FROM chat_messages")
-    suspend fun clearHistory()
+    suspend fun deleteAllMessages()
 }
 
 @Dao
 interface MemoryDao {
-    @Query("SELECT * FROM user_memories")
-    fun getAllMemories(): Flow<List<UserMemory>>
+    @Query("SELECT * FROM memories")
+    fun getAllMemories(): Flow<List<Memory>>
 
-    @Query("SELECT * FROM user_memories WHERE `key` = :key LIMIT 1")
-    suspend fun getMemoryValue(key: String): UserMemory?
+    @Query("SELECT * FROM memories WHERE `key` = :key LIMIT 1")
+    suspend fun getMemoryByKey(key: String): Memory?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun saveMemory(memory: UserMemory)
+    suspend fun insertMemory(memory: Memory)
 
-    @Query("DELETE FROM user_memories WHERE `key` = :key")
+    @Query("DELETE FROM memories WHERE `key` = :key")
     suspend fun deleteMemory(key: String)
 }
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks ORDER BY dueDate ASC")
+    @Query("SELECT * FROM tasks ORDER BY isCompleted ASC, timestamp DESC")
     fun getAllTasks(): Flow<List<Task>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -46,9 +52,9 @@ interface TaskDao {
     suspend fun deleteTask(id: Int)
 }
 
-@Database(entities = [ChatMessage::class, UserMemory::class, Task::class], version = 1, exportSchema = false)
+@Database(entities = [ChatMessage::class, Memory::class, Task::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun chatDao(): ChatDao
+    abstract fun chatMessageDao(): ChatMessageDao
     abstract fun memoryDao(): MemoryDao
     abstract fun taskDao(): TaskDao
 
@@ -62,7 +68,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "jarvis_database"
-                ).fallbackToDestructiveMigration().build()
+                ).build()
                 INSTANCE = instance
                 instance
             }

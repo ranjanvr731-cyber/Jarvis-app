@@ -1,130 +1,97 @@
 package com.example.data
 
-import android.util.Log
 import com.example.BuildConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.IOException
-import java.util.concurrent.TimeUnit
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
+import retrofit2.http.Query
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-object GeminiService {
-    private const val TAG = "GeminiService"
-    
-    // Using gemini-3.5-flash as the default for robust and fast performance
-    private const val MODEL_NAME = "gemini-3.5-flash"
-    private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+@Serializable
+data class GenerateContentRequest(
+    val contents: List<Content>,
+    val generationConfig: GenerationConfig? = null,
+    val systemInstruction: Content? = null
+)
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+@Serializable
+data class Content(
+    val parts: List<Part>
+)
+
+@Serializable
+data class Part(
+    val text: String? = null
+)
+
+@Serializable
+data class GenerationConfig(
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val topK: Int? = null
+)
+
+@Serializable
+data class GenerateContentResponse(
+    val candidates: List<Candidate>? = null
+)
+
+@Serializable
+data class Candidate(
+    val content: Content? = null
+)
+
+interface GeminiApiService {
+    @POST("v1beta/models/gemini-3.5-flash:generateContent")
+    suspend fun generateContent(
+        @Query("key") apiKey: String,
+        @Body request: GenerateContentRequest
+    ): GenerateContentResponse
+}
+
+object RetrofitClient {
+    private const val BASE_URL = "https://generativelanguage.googleapis.com/"
+
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
         .build()
 
-    private val mediaType = "application/json; charset=utf-8".toMediaType()
+    val service: GeminiApiService by lazy {
+        val json = Json { ignoreUnknownKeys = true }
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+        retrofit.create(GeminiApiService::class.java)
+    }
+}
 
-    suspend fun generateResponse(
-        prompt: String,
-        systemInstruction: String,
-        history: List<ChatMessage> = emptyList()
-    ): String = withContext(Dispatchers.IO) {
+class GeminiService {
+    suspend fun queryJarvisCore(prompt: String, systemPrompt: String): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
-            Log.e(TAG, "Gemini API key is not configured.")
-            return@withContext "Error: Gemini API Key is missing. Please configure it in the Secrets panel in AI Studio, sir."
+        if (apiKey.isEmpty() || apiKey == "YOUR_GEMINI_API_KEY_HERE" || apiKey.startsWith("YOUR_")) {
+            return@withContext "API KEY EXCEPTION: Please register your Gemini Core authentication credentials in the AI Studio Secrets panel."
         }
-
-        val url = "$BASE_URL/$MODEL_NAME:generateContent?key=$apiKey"
-
+        
+        val request = GenerateContentRequest(
+            contents = listOf(Content(parts = listOf(Part(text = prompt)))),
+            systemInstruction = Content(parts = listOf(Part(text = systemPrompt)))
+        )
         try {
-            // Build contents array including conversation history if any
-            val contentsArray = JSONArray()
-
-            // 1. Add older history entries
-            history.forEach { msg ->
-                val role = if (msg.sender == "user") "user" else "model"
-                val textPart = JSONObject().put("text", msg.message)
-                val parts = JSONArray().put(textPart)
-                val contentObj = JSONObject()
-                    .put("role", role)
-                    .put("parts", parts)
-                contentsArray.put(contentObj)
-            }
-
-            // 2. Add current prompt
-            val currentUserPart = JSONObject().put("text", prompt)
-            val currentParts = JSONArray().put(currentUserPart)
-            val currentContentObj = JSONObject()
-                .put("role", "user")
-                .put("parts", currentParts)
-            contentsArray.put(currentContentObj)
-
-            // Build request JSON
-            val requestJson = JSONObject().apply {
-                put("contents", contentsArray)
-                
-                // Add system instructions if present
-                if (systemInstruction.isNotEmpty()) {
-                    val systemPart = JSONObject().put("text", systemInstruction)
-                    val systemParts = JSONArray().put(systemPart)
-                    val systemInstructionObj = JSONObject().put("parts", systemParts)
-                    put("systemInstruction", systemInstructionObj)
-                }
-
-                // Add temperature configs inside generationConfig
-                val config = JSONObject()
-                    .put("temperature", 0.7)
-                put("generationConfig", config)
-            }
-
-            val body = requestJson.toString().toRequestBody(mediaType)
-            val request = Request.Builder()
-                .url(url)
-                .post(body)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    val errorBody = response.body?.string() ?: ""
-                    Log.e(TAG, "Request failed code ${response.code}: $errorBody")
-                    
-                    // User friendly parsing
-                    if (response.code == 400 && errorBody.contains("API key not valid")) {
-                        return@withContext "Apologies, sir. The Gemini API key provided appears to be invalid. Please verify it in your AI Studio settings."
-                    }
-                    return@withContext "I encountered a communication error with the core systems, sir. Status code: ${response.code}."
-                }
-
-                val responseBody = response.body?.string() ?: return@withContext "I received an empty telemetry package from the online core, sir."
-                
-                // Parse JSON response
-                val jsonResponse = JSONObject(responseBody)
-                val candidates = jsonResponse.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val firstCandidate = candidates.getJSONObject(0)
-                    val content = firstCandidate.optJSONObject("content")
-                    if (content != null) {
-                        val parts = content.optJSONArray("parts")
-                        if (parts != null && parts.length() > 0) {
-                            return@withContext parts.getJSONObject(0).optString("text", "Telemetry parsing fetched empty text data.")
-                        }
-                    }
-                }
-                
-                return@withContext "My neural link parsed the response, but found no descriptive command outputs, sir."
-            }
-
-        } catch (e: IOException) {
-            Log.e(TAG, "Network exception during generation", e)
-            "A standard network failure occurred while attempting to contact the servers, sir. Details: ${e.localizedMessage ?: "Unknown connection error"}."
+            val response = RetrofitClient.service.generateContent(apiKey, request)
+            response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text 
+                ?: "Negative response payload, sir. The core returned empty results."
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected exception during generation", e)
-            "I suffered a visual syntax buffer overflow inside my parsing routine, sir. Error: ${e.localizedMessage ?: "Unknown parser error"}."
+            "CORE TELEMETRY ERROR: ${e.localizedMessage ?: "Unknown diagnostic failure"}"
         }
     }
 }

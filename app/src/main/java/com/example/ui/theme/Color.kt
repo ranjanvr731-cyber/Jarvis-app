@@ -2,14 +2,13 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Stark Immersive Holographic Palette
-val CyberCyan = Color(0xFF00D2FF)
-val HologramBlue = Color(0xFF0066FF)
-val DeepSpaceNavy = Color(0xFF020B1A)
-val DarkVacuum = Color(0xFF020B1A)
-val TechCardGlass = Color(0x1Affffff) // white/10 or white/5 equivalent
-val GridOutline = Color(0x3300D2FF)
-val AlertOrange = Color(0xFFFF9900)
-val SafeGreen = Color(0xFF34D399) // Emerald-400 equivalent
-val TextHologram = Color(0xFFE2E8F0) // slate-200 equivalent
+val SpaceBackground = Color(0xFF07080E)
+val PrimaryCyber = Color(0xFF00E5FF)
+val AccentHologram = Color(0xFF00B0FF)
+val SafeGreen = Color(0xFF00E676)
+val AlertOrange = Color(0xFFFF9100)
+val DarkError = Color(0xFFFF3333)
 
+val TechCardGlass = Color(0x1B0E1428)
+val BorderCyan = Color(0x4000E5FF)
+val TextHologram = Color(0xCCB2EBF2)

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <style name="Theme.JARVIS" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="android:statusBarColor">#0D0E15</item>
+        <item name="android:navigationBarColor">#0D0E15</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

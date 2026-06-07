@@ -6,24 +6,23 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "chat_messages")
 data class ChatMessage(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val sender: String, // "user" or "jarvis"
-    val message: String,
+    val sender: String, // "USER" or "JARVIS"
+    val content: String,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "user_memories")
-data class UserMemory(
+@Entity(tableName = "memories")
+data class Memory(
     @PrimaryKey val key: String,
     val value: String,
-    val updatedAt: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "tasks")
 data class Task(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
-    val description: String = "",
-    val dueDate: Long,
+    val details: String = "",
     val isCompleted: Boolean = false,
-    val createdDate: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis()
 )

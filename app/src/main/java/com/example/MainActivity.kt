@@ -2,56 +2,45 @@ package com.example
 
 import android.Manifest
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModelProvider
+import com.example.data.Repository
 import com.example.ui.JarvisScreen
 import com.example.ui.JarvisViewModel
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.JarvisViewModelFactory
+import com.example.ui.theme.JarvisTheme
 
 class MainActivity : ComponentActivity() {
-    private val viewModel: JarvisViewModel by viewModels()
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Toast.makeText(this, "Acoustic grid authorization granted, sir.", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Acoustic channels offline. Direct terminal input is active.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Register permission requests launcher at startup
-        val permissionLauncher = registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
-        ) { results ->
-            // Audio recording is core to JARVIS voice systems
-            val audioAllowed = results[Manifest.permission.RECORD_AUDIO] ?: false
-            if (!audioAllowed) {
-                // Log/Handle state in ViewModel or show warning to user
-                viewModel.processIncomingInput("Alert: Microphone permission denied. Some vocal facilities are temporarily offline, sir.")
-            }
-        }
+        val app = application as JarvisApp
+        val repository = Repository(app.database)
+        val factory = JarvisViewModelFactory(repository, applicationContext)
+        val viewModel = ViewModelProvider(this, factory)[JarvisViewModel::class.java]
+
+        // Request recording permission on boot
+        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
 
         setContent {
-            MyApplicationTheme {
-                // Request permissions safely at composition launch
-                LaunchedEffect(Unit) {
-                    permissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.RECORD_AUDIO,
-                            Manifest.permission.CALL_PHONE,
-                            Manifest.permission.SEND_SMS
-                        )
-                    )
-                }
-
-                JarvisScreen(
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxSize()
-                )
+            JarvisTheme {
+                JarvisScreen(viewModel = viewModel)
             }
         }
     }
