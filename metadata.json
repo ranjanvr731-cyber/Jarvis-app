@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS",
+  "description": "A high-fidelity futuristically styled holographic AI assistant inspired by Tony Stark's JARVIS featuring offline controls, speech interaction, and Gemini integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
